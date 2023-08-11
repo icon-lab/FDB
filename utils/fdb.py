@@ -181,9 +181,8 @@ class DiffusionBridge:
 
         return x_t
 
-    def q_posterior_mean_variance(self, x_0, x_t, t):
+    def q_posterior_mean(self, x_0, x_t, t):
         """
-        Compute the mean and variance of the diffusion posterior:
             q(x_{t-1} | x_t, x_0)
         """
         posterior_mean = (
@@ -206,7 +205,7 @@ class DiffusionBridge:
 
         pred_x0 = model_output.clamp(-1, 1)
 
-        x_t_minus_1 = self.q_posterior_mean_variance(x_0=pred_x0, x_t=x_t, t=t)
+        x_t_minus_1 = self.q_posterior_mean(x_0=pred_x0, x_t=x_t, t=t)
 
         return x_t_minus_1
 
