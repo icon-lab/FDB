@@ -7,7 +7,6 @@ import enum
 import math
 
 import numpy as np
-import matplotlib.pyplot as plt
 import torch as th
 import time
 from .nn import mean_flat
