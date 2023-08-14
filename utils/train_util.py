@@ -4,7 +4,6 @@ import os
 
 import blobfile as bf
 import numpy as np
-import matplotlib.pyplot as plt
 import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
