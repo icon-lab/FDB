@@ -71,3 +71,9 @@ You are encouraged to modify/distribute this code. However, please acknowledge t
 For any questions, comments and contributions, please contact Usama Mirza (usama.mirza.819[at]gmail.com ) <br />
 
 (c) ICON Lab 2023
+
+<br />
+
+# Acknowledgements
+
+This code uses libraries from [DiffuseRecon](https://github.com/cpeng93/DiffuseRecon) and [Improved DDPM](https://github.com/openai/improved-diffusion) repositories.
