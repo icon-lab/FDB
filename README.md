@@ -1,5 +1,8 @@
 # FDB
-Official implementation of the [Fourier-constrained diffusion bridges (FDB) model for MRI reconstruction](https://arxiv.org/abs/2308.01096)
+
+Official PyTorch implementation of FDB as described in the [paper](https://arxiv.org/abs/2308.01096)
+
+Muhammad U. Mirza, Onat Dalmaz, Hasan A. Bedel, Gokberk Elmas, Yilmaz Korkmaz, Alper Gungor, Salman UH Dar, Tolga Çukur, "Learning Fourier-Constrained Diffusion Bridges for MRI Reconstruction", arXiv 2023.
 
 <img src="./figures/ddpm_vs_fdb.png" width="600px">
 
@@ -14,6 +17,13 @@ mpi4py==3.1.4
 numpy==1.24.4
 Pillow==10.0.0
 torch==2.0.1
+```
+
+## Installation
+- Clone this repo:
+```
+git clone https://github.com/icon-lab/FDB
+cd FDB
 ```
 
 ## Train
@@ -42,3 +52,22 @@ For Multi-Coil
 ```
 python sample.py --model_path model_multicoil/ema_0.9999_015000.pt --data_path /path_to_data/ --image_size 384 --num_channels 128 --num_res_blocks 3 --learn_sigma False --dropout 0.3 --diffusion_steps 1000 --noise_schedule cosine --save_path results_multicoil --num_samples 1 --batch_size 1 --data_type 'multicoil' --R 8 --contrast 'FLAIR'
 ```
+
+<br />
+<br />
+
+# Citation
+You are encouraged to modify/distribute this code. However, please acknowledge this code and cite the paper appropriately.
+```
+@misc{mirza2023learning,
+      title={Learning Fourier-Constrained Diffusion Bridges for MRI Reconstruction}, 
+      author={Muhammad U. Mirza and Onat Dalmaz and Hasan A. Bedel and Gokberk Elmas and Yilmaz Korkmaz and Alper Gungor and Salman UH Dar and Tolga Çukur},
+      year={2023},
+      eprint={2308.01096},
+      archivePrefix={arXiv},
+      primaryClass={eess.IV}
+}
+```
+For any questions, comments and contributions, please contact Usama Mirza (usama.mirza.819[at]gmail.com ) <br />
+
+(c) ICON Lab 2023
