@@ -42,7 +42,7 @@ def LoadDataSetMultiCoil(load_dir, variable = 'images_fs', padding = True, Norm 
 
 def get_fs_singlecoil(data_dir, phase = 'train'):
     """
-    Returns fully sampled singlecoilimages of shape
+    Returns fully sampled singlecoil images of shape
     [Number of images x height x width]
     """
 
