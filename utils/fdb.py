@@ -8,6 +8,7 @@ import math
 
 import numpy as np
 import torch as th
+import matplotlib.pyplot as plt
 import time
 from .nn import mean_flat
 
@@ -132,6 +133,9 @@ class DiffusionBridge:
             / (1.0 - self.alphas_cumprod)
         )
 
+        self.w1 = np.interp(np.linspace(0, 1, self.num_timesteps), np.linspace(0, 1, 1000), np.load("w.npy"))
+        self.w2 = 1 - self.w1
+
     def fft2c(self, x, dim=((-2,-1)), img_shape=None):
         """ 2 dimensional Fast Fourier Transform """
         return th.fft.fftshift(th.fft.fft2(th.fft.ifftshift(x, dim=dim), s=img_shape, dim=dim), dim = dim)
@@ -185,12 +189,12 @@ class DiffusionBridge:
             q(x_{t-1} | x_t, x_0)
         """
         posterior_mean = (
-            _extract_into_tensor(self.posterior_mean_coef1, t, x_t.shape) * x_0
-            + _extract_into_tensor(self.posterior_mean_coef2, t, x_t.shape) * x_t
+            _extract_into_tensor(self.w1, t, x_t.shape) * x_0
+            + _extract_into_tensor(self.w2, t, x_t.shape) * x_t
         )
         return posterior_mean        
 
-    def p_sample(self, model, x_t, t):
+    def p_sample(self, model, x_t, M, t):
         """
         Sample x_{t-1} from the model at the given timestep.
 
@@ -204,7 +208,7 @@ class DiffusionBridge:
 
         pred_x0 = model_output.clamp(-1, 1)
 
-        x_t_minus_1 = self.q_posterior_mean(x_0=pred_x0, x_t=x_t, t=t)
+        x_t_minus_1 = self.ifft2c(M[t] * self.fft2c(pred_x0)) + _extract_into_tensor(self.w2, t, x_t.shape) * self.ifft2c(M[t+1] * self.fft2c(x_t - pred_x0))
 
         return x_t_minus_1
 
@@ -246,6 +250,45 @@ class DiffusionBridge:
             final.append(sample)
         return final
 
+    def create_mask(self, shape, m_og):
+        if self.data_type == "singlecoil":
+            m_og = m_og[0,0].cpu().detach().numpy().astype('i1')
+        elif self.data_type == "multicoil":
+            m_og = m_og[0,0,0].cpu().detach().numpy().astype('i1')
+
+        rows = m_og.shape[0]
+        cols = m_og.shape[1]
+
+        num_points = rows * cols - np.sum(m_og)
+
+        mask = np.ones((rows, cols))
+        M = np.ones((self.num_timesteps + 1, rows, cols))
+
+        r_start = np.max((rows, cols)) / 2
+        if self.data_type == "singlecoil":
+            r_end = 3
+        elif self.data_type == "multicoil":
+            r_end = 4
+
+        T = self.num_timesteps
+        for t in range(self.num_timesteps):
+            r = r_start - t * (r_start - r_end) / self.num_timesteps
+            p = int(num_points / T)
+            for i in range(p):
+                x = np.random.randint(rows)
+                y = np.random.randint(cols)
+                while mask[x,y] == 0 or m_og[x,y] == 1 or (x-rows/2)**2 + (y-cols/2)**2 < r**2:
+                    x = np.random.randint(rows)
+                    y = np.random.randint(cols)
+
+                mask[x,y] = 0
+
+            M[t+1] = mask
+            num_points -= p
+            T -= 1
+
+        return M
+
     def p_sample_loop_condition_progressive(
         self,
         model,
@@ -279,6 +322,8 @@ class DiffusionBridge:
 
         indices = list(range(self.num_timesteps))[::-1]
 
+        M = th.from_numpy(self.create_mask(shape, mask)).to(device)
+
         for i in indices:
             if i % 100 == 0:
                 print('ITER:', i)
@@ -286,7 +331,7 @@ class DiffusionBridge:
             t = th.tensor([i] * shape[0], device=device)
 
             with th.no_grad():
-                out = self.p_sample(model, img, t)
+                out = self.p_sample(model, img, M, t)
                 img = self.data_consistency(out, kspace, mask, coil_map)
                 yield img
 
