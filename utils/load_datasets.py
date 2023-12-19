@@ -19,6 +19,7 @@ def load_data(
     :param data_dir: a dataset directory.
     :param batch_size: the batch size of each returned pair.
     :param image_size: the size to which images are resized.
+    :param data_type: singlecoil or multicoil data
     """
     if not data_dir:
         raise ValueError("unspecified data directory")

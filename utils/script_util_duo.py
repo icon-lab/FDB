@@ -3,32 +3,7 @@ import inspect
 import numpy as np
 
 from . import fdb as fdb
-from .unet import SuperResModel, UNetModel
-
-class SpacedDiffusion(fdb.DiffusionBridge):
-    """
-    A diffusion process which can skip steps in a base diffusion process.
-
-    :param use_timesteps: a collection (sequence or set) of timesteps from the
-                          original diffusion process to retain.
-    :param kwargs: the kwargs to create the base diffusion process.
-    """
-
-    def __init__(self, use_timesteps, **kwargs):
-        self.use_timesteps = set(use_timesteps)
-        self.timestep_map = []
-        self.original_num_steps = len(kwargs["betas"])
-
-        base_diffusion = fdb.DiffusionBridge(**kwargs)  # pylint: disable=missing-kwoa
-        last_alpha_cumprod = 1.0
-        new_betas = []
-        for i, alpha_cumprod in enumerate(base_diffusion.alphas_cumprod):
-            if i in self.use_timesteps:
-                new_betas.append(1 - alpha_cumprod / last_alpha_cumprod)
-                last_alpha_cumprod = alpha_cumprod
-                self.timestep_map.append(i)
-        kwargs["betas"] = np.array(new_betas)
-        super().__init__(**kwargs)
+from .unet import UNetModel
 
 def model_and_diffusion_defaults():
     """
@@ -43,11 +18,8 @@ def model_and_diffusion_defaults():
         attention_resolutions="16,8",
         dropout=0.0,
         learn_sigma=False,
-        sigma_small=False,
         class_cond=False,
         diffusion_steps=1000,
-        noise_schedule="linear",
-        use_kl=False,
         use_checkpoint=False,
         use_scale_shift_norm=True,
         undersampling_rate=2,
@@ -59,7 +31,6 @@ def create_model_and_diffusion(
     image_size,
     class_cond,
     learn_sigma,
-    sigma_small,
     num_channels,
     num_res_blocks,
     num_heads,
@@ -67,8 +38,6 @@ def create_model_and_diffusion(
     attention_resolutions,
     dropout,
     diffusion_steps,
-    noise_schedule,
-    use_kl,
     use_checkpoint,
     use_scale_shift_norm,
     undersampling_rate,
@@ -89,10 +58,6 @@ def create_model_and_diffusion(
     )
     diffusion = create_gaussian_diffusion(
         steps=diffusion_steps,
-        learn_sigma=learn_sigma,
-        sigma_small=sigma_small,
-        noise_schedule=noise_schedule,
-        use_kl=use_kl,
         undersampling_rate=undersampling_rate,
         image_size=image_size,
         data_type=data_type,
@@ -147,24 +112,17 @@ def create_model(
 def create_gaussian_diffusion(
     *,
     steps=1000,
-    learn_sigma=False,
-    sigma_small=False,
-    noise_schedule="linear",
-    use_kl=False,
     undersampling_rate=2,
     image_size=256,
     data_type="singlecoil",
 ):
-    betas = fdb.get_named_beta_schedule(noise_schedule, steps)
 
-    return SpacedDiffusion(
-        use_timesteps=set(range(steps)),
-        betas=betas,
+    return fdb.DiffusionBridge(
+        steps=steps,
         undersampling_rate=undersampling_rate,
         image_size=image_size,
         data_type=data_type,
     )
-
 
 def add_dict_to_argparser(parser, default_dict):
     for k, v in default_dict.items():

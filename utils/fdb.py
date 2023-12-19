@@ -10,54 +10,8 @@ import numpy as np
 import torch as th
 import matplotlib.pyplot as plt
 import time
+import os
 from .nn import mean_flat
-
-def get_named_beta_schedule(schedule_name, num_diffusion_timesteps):
-    """
-    Get a pre-defined beta schedule for the given name.
-
-    The beta schedule library consists of beta schedules which remain similar
-    in the limit of num_diffusion_timesteps.
-    Beta schedules may be added, but should not be removed or changed once
-    they are committed to maintain backwards compatibility.
-    """
-    if schedule_name == "linear":
-        # Linear schedule from Ho et al, extended to work for any number of
-        # diffusion steps.
-        scale = 1000 / num_diffusion_timesteps
-        beta_start = scale * 0.0001
-        beta_end = scale * 0.02
-        return np.linspace(
-            beta_start, beta_end, num_diffusion_timesteps, dtype=np.float64
-        )
-    elif schedule_name == "cosine":
-        return betas_for_alpha_bar(
-            num_diffusion_timesteps,
-            lambda t: math.cos((t + 0.008) / 1.008 * math.pi / 2) ** 2,
-        )
-    else:
-        raise NotImplementedError(f"unknown beta schedule: {schedule_name}")
-
-
-def betas_for_alpha_bar(num_diffusion_timesteps, alpha_bar, max_beta=0.999):
-    """
-    Create a beta schedule that discretizes the given alpha_t_bar function,
-    which defines the cumulative product of (1-beta) over time from t = [0,1].
-
-    :param num_diffusion_timesteps: the number of betas to produce.
-    :param alpha_bar: a lambda that takes an argument t from 0 to 1 and
-                      produces the cumulative product of (1-beta) up to that
-                      part of the diffusion process.
-    :param max_beta: the maximum beta to use; use values lower than 1 to
-                     prevent singularities.
-    """
-    betas = []
-    for i in range(num_diffusion_timesteps):
-        t1 = i / num_diffusion_timesteps
-        t2 = (i + 1) / num_diffusion_timesteps
-        betas.append(min(1 - alpha_bar(t2) / alpha_bar(t1), max_beta))
-    return np.array(betas)
-
 
 class LossType(enum.Enum):
     MSE = enum.auto()  # use raw MSE loss (and KL when learning variances)
@@ -85,56 +39,25 @@ class DiffusionBridge:
     def __init__(
         self,
         *,
-        betas,
+        steps,
         undersampling_rate,
         image_size,
         data_type,
     ):
-        # Use float64 for accuracy.
-        betas = np.array(betas, dtype=np.float64)
-        self.betas = betas
-        assert len(betas.shape) == 1, "betas must be 1-D"
-        assert (betas > 0).all() and (betas <= 1).all()
 
         self.undersampling_rate = undersampling_rate
         self.image_size = image_size
         self.data_type = data_type
 
-        self.num_timesteps = int(betas.shape[0])
+        self.num_timesteps = steps
 
-        alphas = 1.0 - betas
-        self.alphas_cumprod = np.cumprod(alphas, axis=0)
-        self.alphas_cumprod_prev = np.append(1.0, self.alphas_cumprod[:-1])
-        self.alphas_cumprod_next = np.append(self.alphas_cumprod[1:], 0.0)
-        assert self.alphas_cumprod_prev.shape == (self.num_timesteps,)
-
-        # calculations for diffusion q(x_t | x_{t-1}) and others
-        self.sqrt_alphas_cumprod = np.sqrt(self.alphas_cumprod)
-        self.sqrt_one_minus_alphas_cumprod = np.sqrt(1.0 - self.alphas_cumprod)
-        self.log_one_minus_alphas_cumprod = np.log(1.0 - self.alphas_cumprod)
-        self.sqrt_recip_alphas_cumprod = np.sqrt(1.0 / self.alphas_cumprod)
-        self.sqrt_recipm1_alphas_cumprod = np.sqrt(1.0 / self.alphas_cumprod - 1)
-
-        # calculations for posterior q(x_{t-1} | x_t, x_0)
-        self.posterior_variance = (
-            betas * (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
-        )
-        # log calculation clipped because the posterior variance is 0 at the
-        # beginning of the diffusion chain.
-        self.posterior_log_variance_clipped = np.log(
-            np.append(self.posterior_variance[1], self.posterior_variance[1:])
-        )
-        self.posterior_mean_coef1 = (
-            betas * np.sqrt(self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
-        )
-        self.posterior_mean_coef2 = (
-            (1.0 - self.alphas_cumprod_prev)
-            * np.sqrt(alphas)
-            / (1.0 - self.alphas_cumprod)
-        )
-
-        self.w1 = np.interp(np.linspace(0, 1, self.num_timesteps), np.linspace(0, 1, 1000), np.load("w.npy"))
-        self.w2 = 1 - self.w1
+        if os.path.isfile("w.npy"):
+            self.w = np.load("w.npy")
+            self.w = np.interp(np.linspace(0, 1, self.num_timesteps), np.linspace(0, 1, self.w.shape[0]), self.w)
+            self.n = np.ones(self.w.shape[0])
+        else:
+            self.w = np.zeros(self.num_timesteps)
+            self.n = np.zeros(self.num_timesteps)
 
     def fft2c(self, x, dim=((-2,-1)), img_shape=None):
         """ 2 dimensional Fast Fourier Transform """
@@ -170,6 +93,7 @@ class DiffusionBridge:
 
         img = x_0[:, [0]] + x_0[:, [1]] * 1j
         img = self.fft2c(img)
+        img_0 = th.clone(img)
 
         for i in range(n):
             x = np.random.randint(dim)
@@ -179,20 +103,17 @@ class DiffusionBridge:
                 y = np.random.randint(dim)
             img[:, :, x, y] = 0
 
+            if i == n - int(N / T):
+                img_t_minus_1 = th.clone(img)
+
+        self.w[t] = (self.n[t] / (self.n[t] + 1)) * self.w[t] + (1 / (self.n[t] + 1)) * ((th.mean(th.abs(img_t_minus_1)) - th.mean(th.abs(img))) / (th.mean(th.abs(img_0)) - th.mean(th.abs(img)))).cpu().detach().numpy()
+        self.n[t] += 1
+        np.save("w.npy", self.w)
+
         img = self.ifft2c(img)
         x_t = th.cat([img.real, img.imag], 1)
 
-        return x_t
-
-    def q_posterior_mean(self, x_0, x_t, t):
-        """
-            q(x_{t-1} | x_t, x_0)
-        """
-        posterior_mean = (
-            _extract_into_tensor(self.w1, t, x_t.shape) * x_0
-            + _extract_into_tensor(self.w2, t, x_t.shape) * x_t
-        )
-        return posterior_mean        
+        return x_t       
 
     def p_sample(self, model, x_t, M, t):
         """
@@ -208,7 +129,7 @@ class DiffusionBridge:
 
         pred_x0 = model_output.clamp(-1, 1)
 
-        x_t_minus_1 = self.ifft2c(M[t] * self.fft2c(pred_x0)) + _extract_into_tensor(self.w2, t, x_t.shape) * self.ifft2c(M[t+1] * self.fft2c(x_t - pred_x0))
+        x_t_minus_1 = self.ifft2c(M[t] * self.fft2c(pred_x0)) + _extract_into_tensor(1 - self.w, t, x_t.shape) * self.ifft2c(M[t+1] * self.fft2c(x_t - pred_x0))
 
         return x_t_minus_1
 
