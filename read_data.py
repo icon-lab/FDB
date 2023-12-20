@@ -20,23 +20,23 @@ def LoadDataSetMultiCoil(load_dir, variable = 'images_fs', padding = True, Norm 
         data=np.transpose(np.array(f[variable]),(1,0,2,3))
 
     if is_complex:
-        data  = data['real'] + 1j*data['imag']    
+        data  = data['real'] + 1j*data['imag']
     else:
         data=data.astype(np.float32)
 
     if Norm:
-        #normalize each subject    
+        #normalize each subject
         subjects=int(data.shape[0]/slices )
-        data=np.split(data,subjects,axis=0)  
+        data=np.split(data,subjects,axis=0)
         data=[x/abs(x).max() for x in data]
-        data=np.concatenate(data,axis=0)  
-    
-    if channel_cat:    
+        data=np.concatenate(data,axis=0)
+
+    if channel_cat:
         data  = np.concatenate((data.real, data.imag), axis=1)
 
     if padding:
         pad_x = int((res[0]-data.shape[2])/2); pad_y = int((res[1]-data.shape[3])/2)
-        data=np.pad(data,((0,0),(0,0),(pad_x, pad_x),(pad_y, pad_y)))  
+        data=np.pad(data,((0,0),(0,0),(pad_x, pad_x),(pad_y, pad_y)))
 
     return data
 
@@ -98,7 +98,7 @@ def get_fs_multicoil(data_dir, phase = 'train'):
     print("Loading FLAIR images")
     target_file = data_dir + "FLAIR/FLAIR_under_sampled_2x_multicoil_" + str(phase)+ ".mat"
     data_fs_flair=LoadDataSetMultiCoil(target_file)
-   
+
     data_fs=np.concatenate((data_fs_t1,data_fs_t2,data_fs_flair),axis=0)
     data_fs = np.squeeze(data_fs)
 
@@ -120,8 +120,8 @@ def get_us_multicoil(data_dir, phase='test', contrast= 'T1', R = 4):
 
     target_file = data_dir + contrast + "/" + contrast + "_under_sampled_" + str(R) + "x_multicoil_" + str(phase) + ".mat"
     data_fs = LoadDataSetMultiCoil(target_file, 'images_fs', padding = False, Norm = True, channel_cat = False)
-    data_us = LoadDataSetMultiCoil(target_file, 'images_us', padding = False, Norm = True, channel_cat = False)        
-    masks = LoadDataSetMultiCoil(target_file, 'map', padding = False, Norm = False, is_complex = False, channel_cat = False)                    
+    data_us = LoadDataSetMultiCoil(target_file, 'images_us', padding = False, Norm = True, channel_cat = False)
+    masks = LoadDataSetMultiCoil(target_file, 'map', padding = False, Norm = False, is_complex = False, channel_cat = False)
     coil_maps = LoadDataSetMultiCoil(target_file, 'coil_maps', padding = False, Norm = False, channel_cat = False)
 
     print(data_us.shape, masks.shape, coil_maps.shape)
