@@ -198,7 +198,6 @@ class TrainLoop:
                 self.ddp_model,
                 micro,
                 t,
-                self.save_dir,
                 model_kwargs=micro_cond,
             )
 

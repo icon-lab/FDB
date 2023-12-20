@@ -29,8 +29,7 @@ class DiffusionBridge:
     Ported directly from here, and then adapted over time to further experimentation.
     https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0706c543/diffusion_tf/diffusion_utils_2.py#L42
 
-    :param betas: a 1-D numpy array of betas for each diffusion timestep,
-                  starting at T and going to 1.
+    :param steps: number of timesteps.
     :param undersampling_rate: acceleration rate determining intensity of k-space removal.
     :param image_size: the dimensions of the image used by the model.
     :param data_type: a string to differntiate singlecoil and multicoil.
@@ -113,7 +112,7 @@ class DiffusionBridge:
         img = self.ifft2c(img)
         x_t = th.cat([img.real, img.imag], 1)
 
-        return x_t       
+        return x_t
 
     def p_sample(self, model, x_t, M, t):
         """
@@ -171,16 +170,23 @@ class DiffusionBridge:
             final.append(sample)
         return final
 
-    def create_mask(self, shape, m_og):
+    def create_mask(self, m_us):
+        """
+        Generate masks for each reverse time step.
+
+        :param m_us: the original undersampling mask of the undersampled image.
+        :return M: an undersampling mask for each reverse timestep
+        """
+
         if self.data_type == "singlecoil":
-            m_og = m_og[0,0].cpu().detach().numpy().astype('i1')
+            m_us = m_us[0,0].cpu().detach().numpy().astype('i1')
         elif self.data_type == "multicoil":
-            m_og = m_og[0,0,0].cpu().detach().numpy().astype('i1')
+            m_us = m_us[0,0,0].cpu().detach().numpy().astype('i1')
 
-        rows = m_og.shape[0]
-        cols = m_og.shape[1]
+        rows = m_us.shape[0]
+        cols = m_us.shape[1]
 
-        num_points = rows * cols - np.sum(m_og)
+        num_points = rows * cols - np.sum(m_us)
 
         mask = np.ones((rows, cols))
         M = np.ones((self.num_timesteps + 1, rows, cols))
@@ -198,7 +204,7 @@ class DiffusionBridge:
             for i in range(p):
                 x = np.random.randint(rows)
                 y = np.random.randint(cols)
-                while mask[x,y] == 0 or m_og[x,y] == 1 or (x-rows/2)**2 + (y-cols/2)**2 < r**2:
+                while mask[x,y] == 0 or m_us[x,y] == 1 or (x-rows/2)**2 + (y-cols/2)**2 < r**2:
                     x = np.random.randint(rows)
                     y = np.random.randint(cols)
 
@@ -243,7 +249,7 @@ class DiffusionBridge:
 
         indices = list(range(self.num_timesteps))[::-1]
 
-        M = th.from_numpy(self.create_mask(shape, mask)).to(device)
+        M = th.from_numpy(self.create_mask(mask)).to(device)
 
         for i in indices:
             if i % 100 == 0:
@@ -291,7 +297,7 @@ class DiffusionBridge:
         out = th.cat([out1.real, out1.imag], 1).to(th.float32)
         return out
 
-    def training_losses(self, model, x_0, t, save_dir, model_kwargs=None):
+    def training_losses(self, model, x_0, t, model_kwargs=None):
         """
         Compute training losses for a single timestep.
 
