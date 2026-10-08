@@ -1,8 +1,8 @@
 # FDB
 
-Official PyTorch implementation of FDB as described in the [paper](https://arxiv.org/abs/2308.01096)
+Official PyTorch implementation of FDB as described in the [paper](https://ieeexplore.ieee.org/abstract/document/11433825/)
 
-Muhammad U. Mirza, Onat Dalmaz, Hasan A. Bedel, Gokberk Elmas, Yilmaz Korkmaz, Alper Gungor, Salman UH Dar, Tolga Çukur, "Learning Fourier-Constrained Diffusion Bridges for MRI Reconstruction", arXiv 2023.
+Mirza, M. Usama, Onat Dalmaz, Hasan A. Bedel, Gokberk Elmas, Yilmaz Korkmaz, Alper Gungor, Salman UH Dar, Kader K. Oguz, and Tolga Çukur. "Learning fourier-constrained diffusion bridges for mri reconstruction." IEEE Transactions on Medical Imaging (2026).
 
 <img src="./figures/ddpm_vs_fdb.png" width="600px">
 
@@ -59,13 +59,12 @@ python sample.py --model_path model_multicoil/ema_0.9999_015000.pt --data_path /
 # Citation
 You are encouraged to modify/distribute this code. However, please acknowledge this code and cite the paper appropriately.
 ```
-@misc{mirza2023learning,
-      title={Learning Fourier-Constrained Diffusion Bridges for MRI Reconstruction}, 
-      author={Muhammad U. Mirza and Onat Dalmaz and Hasan A. Bedel and Gokberk Elmas and Yilmaz Korkmaz and Alper Gungor and Salman UH Dar and Tolga Çukur},
-      year={2023},
-      eprint={2308.01096},
-      archivePrefix={arXiv},
-      primaryClass={eess.IV}
+@article{mirza2026learning,
+  title={Learning fourier-constrained diffusion bridges for mri reconstruction},
+  author={Mirza, M Usama and Dalmaz, Onat and Bedel, Hasan A and Elmas, Gokberk and Korkmaz, Yilmaz and Gungor, Alper and Dar, Salman UH and Oguz, Kader K and {\c{C}}ukur, Tolga},
+  journal={IEEE Transactions on Medical Imaging},
+  year={2026},
+  publisher={IEEE}
 }
 ```
 For any questions, comments and contributions, please contact Usama Mirza (usama.mirza.819[at]gmail.com ) <br />
